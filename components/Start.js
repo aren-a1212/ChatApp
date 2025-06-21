@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { StyleSheet, View, Text, Button, TextInput, TouchableOpacity, ImageBackground, ScrollView } from 'react-native';
+import { StyleSheet, View, Text, Button, TextInput, TouchableOpacity, ImageBackground, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import background from '../assets/background.png';
 
 const COLOR_OPTIONS = [
@@ -18,6 +18,13 @@ const handleStart =()=>{
   navigation.navigate('Chat', {name:name, bgColor})
 }
     return(
+      <KeyboardAvoidingView
+      style={styles.keyboardAvoiding}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
+    >
+
+
       <ImageBackground
       source={background}
       style={styles.background}
@@ -25,6 +32,7 @@ const handleStart =()=>{
       <ScrollView 
       contentContainerStyle={styles.scrollContainer}
       >
+      
 
       <View style={styles.viewing}>
       <TextInput 
@@ -59,13 +67,19 @@ const handleStart =()=>{
         </Text> 
         </TouchableOpacity>
       </View>
+    
+      
       </ScrollView>
       </ImageBackground>
+      </KeyboardAvoidingView>
         
     );
 };
 
 const styles = StyleSheet.create({
+  keyboardAvoiding: {
+    flex: 1,
+  },
     background: {
       flex: 1,
       justifyContent: 'center',
