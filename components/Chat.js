@@ -2,40 +2,41 @@ import React from 'react';
 import { GiftedChat, InputToolbar } from 'react-native-gifted-chat';
 import { useEffect, useState } from 'react';
 import { StyleSheet, View, Text,Platform, KeyboardAvoidingView, ImageBackground, ScrollView } from 'react-native';
+import { addDoc, collection, onSnapshot, query, orderBy } from 'firebase/firestore';
 
-
-const Chat = ({route, navigation}) => {
- const {name, bgColor} = route.params;  
+const Chat = ({route, db,  navigation}) => {
+ const {name, bgColor, userId} = route.params;  
  const [messages, SetMessages]= useState([]); 
 
-
- useEffect(() => {
-  navigation.setOptions({ title: name });
-// Seed chat with a system message and a test user message
-  SetMessages([
-    {
-      _id: 1,
-      text: `Hello ${name}!you have entered the chat`,
-      createdAt: new Date(),
-      system: true
-    },
-    {
-    _id: 2,
-    text: 'Hey everyone, this is a test message.',
-    createdAt: new Date(),
-    user: {
-      _id: 2,
-      name: 'ChatUser'
-    }
-  }
-]);
+useEffect(() => {
+ navigation.setOptions({ title: name });
+ const q = query(collection(db, "messages"), orderBy("createdAt", "desc"));
+ const unsubMessages = onSnapshot(q, (docs) => {
+   let newMessages = [];
+   docs.forEach(doc => {
+     newMessages.push({
+       id: doc.id,
+       ...doc.data(),
+       createdAt: new Date(doc.data().createdAt.toMillis())
+     })
+   })
+   SetMessages(newMessages);
+ })
+ return () => {
+   if (unsubMessages) unsubMessages();
+ }
 }, []);
  // Handler for sending new messages
-const onSend= (newMessages)=>{
-  SetMessages(previousMessages=>
-    GiftedChat.append(previousMessages, newMessages)
-  );
-};
+const onSend = (newMessages = []) => {
+    addDoc(collection(db, "messages"), {
+      ...newMessages[0],
+      createdAt: new Date(),
+      user: {
+        _id: userId,
+        name: name
+      }
+    });
+  };
 
 
   return (
@@ -46,10 +47,7 @@ const onSend= (newMessages)=>{
       <GiftedChat
         messages={messages}
         onSend={messages => onSend(messages)}
-        user={{
-          _id: 1,
-          name:name
-        }}
+       user={{ _id: route.params.userId, name }}
         wrapperStyle={styles.chatWrapper}
           messagesContainerStyle={styles.messagesContainer}
 
