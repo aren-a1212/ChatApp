@@ -3,15 +3,27 @@ import { GiftedChat, InputToolbar } from 'react-native-gifted-chat';
 import { useEffect, useState } from 'react';
 import { StyleSheet, View, Text,Platform, KeyboardAvoidingView, ImageBackground, ScrollView } from 'react-native';
 import { addDoc, collection, onSnapshot, query, orderBy } from 'firebase/firestore';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const Chat = ({route, db,  navigation}) => {
+
+
+const Chat = ({route, db,  navigation , isConnected , storage}) => {
  const {name, bgColor, userId} = route.params;  
  const [messages, SetMessages]= useState([]); 
 
+
+
+ let unsubMessages;
+
 useEffect(() => {
  navigation.setOptions({ title: name });
+if (isConnected === true) {
+      if (unsubMessages) unsubMessages();
+      unsubMessages = null;
+
+
  const q = query(collection(db, "messages"), orderBy("createdAt", "desc"));
- const unsubMessages = onSnapshot(q, (docs) => {
+  unsubMessages = onSnapshot(q, (docs) => {
    let newMessages = [];
    docs.forEach(doc => {
      newMessages.push({
@@ -20,23 +32,43 @@ useEffect(() => {
        createdAt: new Date(doc.data().createdAt.toMillis())
      })
    })
+   cacheMessages(newMessages);
    SetMessages(newMessages);
  })
- return () => {
+}else loadCachedMessages();
+
+return () => {
    if (unsubMessages) unsubMessages();
  }
-}, []);
- // Handler for sending new messages
-const onSend = (newMessages = []) => {
-    addDoc(collection(db, "messages"), {
-      ...newMessages[0],
-      createdAt: new Date(),
-      user: {
-        _id: userId,
-        name: name
-      }
-    });
+}, [isConnected]);
+
+  const loadCachedMessages = async () => {
+    const cachedMessages = await AsyncStorage.getItem("messages") || [];
+    SetMessages(JSON.parse(cachedMessages));
   };
+
+   const cacheMessages = async (messagesToCache) => {
+    try {
+      await AsyncStorage.setItem('messages', JSON.stringify(messagesToCache));
+    } catch (error) {
+      console.log(error.message);
+    }
+  }
+ // Handler for sending new messages
+  const onSend = async (newMessages) => {
+    console.log('onSend in Chat.js called with:', newMessages);
+    try {
+      await addDoc(collection(db, "messages"), newMessages[0]);
+      console.log('Message sent to Firestore successfully!');
+    } catch (error) {
+      console.error('Error sending message to Firestore:', error);
+      // Optionally, display an error message to the user
+    }
+  }
+   const renderInputToolbar = (props) => {
+    if (isConnected === true) return <InputToolbar {...props} />;
+    else return null;
+  }
 
 
   return (
