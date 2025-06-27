@@ -65,10 +65,10 @@ return () => {
       // Optionally, display an error message to the user
     }
   }
-   const renderInputToolbar = (props) => {
-    if (isConnected === true) return <InputToolbar {...props} />;
-    else return null;
-  }
+  const renderInputToolbar = (props) => {
+  if (isConnected === true) return <InputToolbar {...props} containerStyle={styles.inputToolbarContainer} />;
+  else return null;
+}
 
 
   return (
@@ -77,21 +77,14 @@ return () => {
        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
        keyboardVerticalOffset={Platform.select({ ios: 90, android: 0 })} >
       <GiftedChat
-        messages={messages}
-        onSend={messages => onSend(messages)}
-       user={{ _id: route.params.userId, name }}
-        wrapperStyle={styles.chatWrapper}
-          messagesContainerStyle={styles.messagesContainer}
-
-          renderInputToolbar={props => (
-            <InputToolbar
-              {...props}
-              containerStyle={styles.inputToolbarContainer}
-            />
-          )}
-
-          bottomOffset={0}
-        />
+  messages={messages}
+  onSend={messages => onSend(messages)}
+  user={{ _id: userId, name }}
+  wrapperStyle={styles.chatWrapper}
+  messagesContainerStyle={styles.messagesContainer}
+  renderInputToolbar={renderInputToolbar}
+  bottomOffset={0}
+/>
       
       </KeyboardAvoidingView>
     </View>
