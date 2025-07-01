@@ -1,20 +1,24 @@
-import 'react-native-reanimated';
-import React, {useEffect} from 'react';
-import { NativeModules, Alert } from 'react-native';
-import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
-import Start from './components/Start';
-import Chat from './components/Chat';
-import { initializeApp } from "firebase/app";
+import React, { useEffect } from 'react';
+import { LogBox, Alert, StyleSheet } from 'react-native';
+import { initializeApp, getApps, getApp } from 'firebase/app';
+import { getFirestore, disableNetwork, enableNetwork } from 'firebase/firestore';
+import { getStorage } from 'firebase/storage';
+import { getAuth, onAuthStateChanged, signInAnonymously, initializeAuth, getReactNativePersistence } from 'firebase/auth';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { getFirestore, enableNetwork, disableNetwork } from 'firebase/firestore';
-import { getStorage } from 'firebase/storage';
 import { useNetInfo } from '@react-native-community/netinfo';
 
-const App = () => {
+import Start from './components/Start';
+import Chat from './components/Chat';
 
-  const connectionStatus= useNetInfo();
+const Stack = createNativeStackNavigator();
+
+LogBox.ignoreLogs([
+  'AsyncStorage has been extracted from react-native core',
+]);
+
+
 const firebaseConfig = {
   apiKey: "AIzaSyAzHV2aSu4tQuWy8g6YjZ5xJtXnSLn9Eu0",
   authDomain: "chatapp-8f914.firebaseapp.com",
@@ -24,28 +28,60 @@ const firebaseConfig = {
   appId: "1:634128028899:web:d10ce9ff0a69bf2ff0e1d6"
 };
 
-const app = initializeApp(firebaseConfig); 
+let app;
+if (getApps().length === 0) {
+  console.log("Initializing Firebase app...");
+  app = initializeApp(firebaseConfig);
+} else {
+  console.log("Firebase app already initialized, using existing app...");
+  app = getApp();
+}
+
  
 const db   = getFirestore(app);
 const storage= getStorage(app);
-
-const Stack = createNativeStackNavigator();
-
-useEffect(()=>{
-  if(connectionStatus.isConnected === false){
-    Alert.alert("Connection lost")
-    disableNetwork(db);
-  }else if (connectionStatus.isConnected === true){
-    enableNetwork(db);
+let auth;
+try {
+  auth = initializeAuth(app, {
+    persistence: getReactNativePersistence(AsyncStorage)
+  });
+} catch (e) {
+  if (e.code === 'auth/already-initialized') {
+    auth = getAuth(app);
+  } else {
+    throw e;
   }
-},[connectionStatus.isConnected]);
+}
+
+const App = ()=>{
+   const connectionStatus = useNetInfo();
+
+  useEffect(() => {
+    if (connectionStatus.isConnected === false) {
+      Alert.alert("Connection Lost!");
+      disableNetwork(db);
+    } else if (connectionStatus.isConnected === true) {
+      enableNetwork(db);
+    }
+  }, [connectionStatus.isConnected]);
 
 
+ useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (!user) {
+        signInAnonymously(auth)
+          .then(() => {
+            console.log('Signed in anonymously');
+          })
+          .catch((error) => {
+            console.error('Unable to sign in:', error.message);
+            Alert.alert('Unable to sign in', error.message);
+          });
+      }
+    });
 
-
-
-
-
+    return () => unsubscribe();
+  }, []);
 
   return (
     <NavigationContainer>
@@ -54,16 +90,18 @@ useEffect(()=>{
       >
         <Stack.Screen
           name="Start">
-         {props => <Start {...props}  component={Start} />}
+         {props => <Start {...props} db={db} component={Start} />}
        </Stack.Screen>
         <Stack.Screen
           name="Chat" >
-         {props => <Chat {...props} db={db} isConnected={connectionStatus.isConnected} storage={storage} />}
+         {props => <Chat {...props} db={db} isConnected={connectionStatus.isConnected} storage={storage} {...props}  
+
+         />}
         </Stack.Screen>
       </Stack.Navigator>
     </NavigationContainer>
   );
-}
+};
 
 const styles = StyleSheet.create({
   container: {

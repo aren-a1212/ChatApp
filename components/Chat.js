@@ -1,121 +1,144 @@
-import React from 'react';
-import { GiftedChat, InputToolbar } from 'react-native-gifted-chat';
 import { useEffect, useState } from 'react';
-import { StyleSheet, View, Text,Platform, KeyboardAvoidingView, ImageBackground, ScrollView } from 'react-native';
-import { addDoc, collection, onSnapshot, query, orderBy } from 'firebase/firestore';
+import { StyleSheet, View, KeyboardAvoidingView, Platform } from 'react-native';
+import { GiftedChat, Bubble, InputToolbar } from "react-native-gifted-chat";
+import { collection, onSnapshot, query, orderBy, addDoc } from 'firebase/firestore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import CustomActions from './CustomActions';
+import MapView from 'react-native-maps';
 
+const Chat = ({ route, navigation, db, isConnected, storage }) => {
+  const { name, bgColor, userID } = route.params;
+  const [messages, setMessages] = useState([]);
 
+  useEffect(() => {
+    navigation.setOptions({ title: name, color: bgColor });
+  }, [name, bgColor]);
 
-const Chat = ({route, db,  navigation , isConnected , storage}) => {
- const {name, bgColor, userId} = route.params;  
- const [messages, SetMessages]= useState([]); 
+  let unsub;
 
+  useEffect(() => {
+    if (isConnected === true) {
+      if (unsub) unsub();
+      unsub = null;
 
+      const q = query(collection(db, "messages"), orderBy("createdAt", "desc"));
+      unsub = onSnapshot(q, (docs) => {
+        let newMessages = [];
+        docs.forEach(doc => {
+          newMessages.push({
+            id: doc.id,
+            ...doc.data(),
+            createdAt: new Date(doc.data().createdAt.toMillis())
+          });
+        });
+        cacheMessages(newMessages);
+        setMessages(newMessages);
+      });
+    } else {
+      loadCachedMessages();
+    }
 
- let unsubMessages;
+    return () => {
+      if (unsub) unsub();
+    };
+  }, [isConnected]);
 
-useEffect(() => {
- navigation.setOptions({ title: name });
-if (isConnected === true) {
-      if (unsubMessages) unsubMessages();
-      unsubMessages = null;
-
-
- const q = query(collection(db, "messages"), orderBy("createdAt", "desc"));
-  unsubMessages = onSnapshot(q, (docs) => {
-   let newMessages = [];
-   docs.forEach(doc => {
-     newMessages.push({
-       id: doc.id,
-       ...doc.data(),
-       createdAt: new Date(doc.data().createdAt.toMillis())
-     })
-   })
-   cacheMessages(newMessages);
-   SetMessages(newMessages);
- })
-}else loadCachedMessages();
-
-return () => {
-   if (unsubMessages) unsubMessages();
- }
-}, [isConnected]);
-
-  const loadCachedMessages = async () => {
-    const cachedMessages = await AsyncStorage.getItem("messages") || [];
-    SetMessages(JSON.parse(cachedMessages));
-  };
-
-   const cacheMessages = async (messagesToCache) => {
+  const cacheMessages = async (messagesToCache) => {
     try {
       await AsyncStorage.setItem('messages', JSON.stringify(messagesToCache));
     } catch (error) {
       console.log(error.message);
     }
-  }
- // Handler for sending new messages
-  const onSend = async (newMessages) => {
-    console.log('onSend in Chat.js called with:', newMessages);
-    try {
-      await addDoc(collection(db, "messages"), newMessages[0]);
-      console.log('Message sent to Firestore successfully!');
-    } catch (error) {
-      console.error('Error sending message to Firestore:', error);
-      // Optionally, display an error message to the user
-    }
-  }
-  const renderInputToolbar = (props) => {
-  if (isConnected === true) return <InputToolbar {...props} containerStyle={styles.inputToolbarContainer} />;
-  else return null;
-}
+  };
 
+  const loadCachedMessages = async () => {
+    const cachedMessages = await AsyncStorage.getItem("messages") || [];
+    setMessages(JSON.parse(cachedMessages));
+  };
+
+  const onSend = (newMessages = []) => {
+    setMessages(GiftedChat.append(messages, newMessages));
+    newMessages.forEach(message => {
+      addDoc(collection(db, "messages"), message);
+    });
+  };
+
+  const renderBubble = (props) => {
+    return <Bubble
+      {...props}
+      wrapperStyle={{
+        right: {
+          backgroundColor: "#000"
+        },
+        left: {
+          backgroundColor: "#FFF"
+        }
+      }}
+    />;
+  };
+
+  const renderInputToolbar = (props) => {
+    if (isConnected) return <InputToolbar {...props} />;
+    else return null;
+  };
+
+  const renderCustomActions = (props) => {
+    return <CustomActions storage={storage} {...props} onSend={onSend} userID={userID} />;
+  };
+
+  const renderCustomView = (props) => {
+    const { currentMessage } = props;
+    if (currentMessage.location) {
+      return (
+        <MapView
+          style={{ width: 150, height: 100, borderRadius: 13, margin: 3 }}
+          region={{
+            latitude: currentMessage.location.latitude,
+            longitude: currentMessage.location.longitude,
+            latitudeDelta: 0.0922,
+            longitudeDelta: 0.0421,
+          }}
+        />
+      );
+    }
+    return null;
+  };
 
   return (
-    <View style={[styles.background, { backgroundColor: bgColor }]}>
-      <KeyboardAvoidingView style={styles.flex}
-       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-       keyboardVerticalOffset={Platform.select({ ios: 90, android: 0 })} >
+    <View
+      style={[styles.mcontainer, { backgroundColor: bgColor }]}
+
+    >
       <GiftedChat
-  messages={messages}
-  onSend={messages => onSend(messages)}
-  user={{ _id: userId, name }}
-  wrapperStyle={styles.chatWrapper}
-  messagesContainerStyle={styles.messagesContainer}
-  renderInputToolbar={renderInputToolbar}
-  bottomOffset={0}
-/>
-      
-      </KeyboardAvoidingView>
+        messages={messages}
+        renderBubble={renderBubble}
+        renderInputToolbar={renderInputToolbar}
+        renderActions={renderCustomActions}
+        renderCustomView={renderCustomView}
+        onSend={messages => onSend(messages)}
+        user={{
+          _id: userID,
+          name: name
+        }}
+        keyboardShouldPersistTaps={'never'}
+      />
+
+
     </View>
   );
 };
 
 const styles = StyleSheet.create({
- background: {
-   flex: 1
- },
- flex:{
-  flex: 1
- },
- scrollContainer:{
-flexGrow:1
- },
-  // 1) Outer wrapper that replaces the big white background
-  chatWrapper: {
-    backgroundColor: 'transparent',  
-    marginTop: 0,
+  container: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center'
   },
-  // 2) Messages list container
-  messagesContainer: {
-    backgroundColor: 'transparent',
-    paddingTop: 0,
+  mcontainer: {
+    flex: 1,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 0
   },
-  inputToolbarContainer: {
-    backgroundColor: 'transparent',
-    borderTopWidth: 0,
-    paddingVertical: 6,
-  },
+
 });
 
 export default Chat;

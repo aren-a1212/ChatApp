@@ -1,17 +1,30 @@
 # ChatApp
 
-**A simple Expo/React Native chat application.**
+Chat app is an easy to use and effective app that can be used to send and receive chat messages in real time. Chat messages can be simply text messages, or include photos or geolocations.
 
-## 📚 Overview
-- Users enter their name & pick a chat-background color  
-- Real-time messaging powered by [your backend of choice]
+
+## Features
+
+Chat is customizable: users enter their name and can select a chosen background colour.
+
+Users don't need an account. they can use anonymous authentication from Firebase Auth.
+
+Messages stored within Firebase database.
+
+App determines if user is online or not (using Network status detection with @react-native-community/netinfo) and if necessary AsyncStorage renders past messages (but no new messages can be sent)
+
+Chat messages can include images (both from the camera and camera roll) using Firebase Storage, as well as geolocations
+with react-native-maps.
+
 
 ## 🚀 Getting Started
 
 ### Prerequisites
-- Node.js ≥16.19.0  
-- Expo CLI: `npm install -g expo-cli`  
-- (Optional) GitHub CLI: `gh`
+* React Native (Expo)
+* Firebase (Auth, Firestore, Storage)
+* React Navigation
+* Gifted Chat
+* AsyncStorage
 
 ### Installation
 ```bash
